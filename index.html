@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ERGM Method Selector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1c1c1a;          /* near-black text */
+    --paper:#fcfcfa;        /* soft white */
+    --rule:#d9d6cf;         /* hairline */
+    --rule-strong:#3a3935;  /* dark rule */
+    --accent:#6d2620;       /* muted oxblood, used sparingly */
+    --muted:#777067;        /* secondary text */
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;min-height:100vh;background:var(--paper);color:var(--ink);
+    font-family:"Source Serif 4",Georgia,"Times New Roman",serif;
+    font-size:18px;line-height:1.55;-webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  .wrap{max-width:680px;margin:0 auto;padding:64px 28px 96px;}
+
+  /* masthead */
+  .kicker{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+  h1{font-weight:700;font-size:clamp(30px,5vw,42px);line-height:1.1;margin:.3em 0 .35em;letter-spacing:-.01em;}
+  h1 em{font-style:italic;font-weight:600;}
+  .src{font-size:14px;color:var(--muted);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:14px 0;margin-bottom:4px;font-style:italic;}
+  .src b{color:var(--ink);font-style:normal;font-weight:600;}
+
+  /* progress + crumbs */
+  .prog{display:flex;gap:5px;margin:30px 0 10px;}
+  .pseg{height:2px;flex:1;background:var(--rule);}
+  .pseg.done,.pseg.active{background:var(--ink);}
+  .crumbs{font-size:13.5px;color:var(--muted);min-height:18px;line-height:1.5;}
+  .crumbs span{color:var(--muted);}
+  .crumbs b{color:var(--ink);font-weight:600;}
+
+  /* question */
+  .stage{animation:fade .3s ease both;}
+  @keyframes fade{from{opacity:0;}to{opacity:1;}}
+  .qnum{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-top:40px;}
+  .qtext{font-weight:600;font-size:clamp(22px,3.6vw,28px);line-height:1.2;margin:.2em 0 .3em;letter-spacing:-.005em;}
+  .qhelp{color:var(--muted);font-size:16.5px;margin-bottom:26px;max-width:58ch;}
+
+  /* options — plain ruled list, no cards */
+  .opts{display:flex;flex-direction:column;border-top:1px solid var(--rule);}
+  .opt{
+    text-align:left;cursor:pointer;background:none;border:none;
+    border-bottom:1px solid var(--rule);padding:18px 4px 18px 0;
+    font-family:inherit;color:var(--ink);width:100%;
+    display:flex;align-items:baseline;gap:14px;transition:padding-left .15s ease;
+  }
+  .opt:hover{padding-left:10px;}
+  .opt .mark{color:var(--rule);font-size:15px;flex:0 0 auto;transition:color .15s ease;line-height:1.5;}
+  .opt:hover .mark{color:var(--accent);}
+  .opt .otext{flex:1;}
+  .opt .ot{font-weight:600;font-size:19px;display:block;}
+  .opt .od{font-size:15.5px;color:var(--muted);line-height:1.45;margin-top:1px;}
+
+  .back{margin-top:30px;background:none;border:none;font-family:inherit;font-size:15px;font-style:italic;color:var(--muted);cursor:pointer;padding:4px 0;}
+  .back:hover{color:var(--accent);}
+  .back::before{content:"← ";font-style:normal;}
+
+  /* result */
+  .result{animation:fade .35s ease both;}
+  .rlabel{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-top:34px;}
+  .rfam{font-size:14.5px;color:var(--muted);font-style:italic;margin-top:8px;}
+  .rname{font-weight:700;font-size:clamp(24px,4vw,32px);line-height:1.12;margin:.15em 0 .2em;letter-spacing:-.01em;}
+  .rhead{border-bottom:2px solid var(--rule-strong);padding-bottom:18px;margin-bottom:4px;}
+  .rrow{padding:18px 0;border-bottom:1px solid var(--rule);}
+  .rrow .rk{font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;display:block;margin-bottom:6px;}
+  .rrow .rv{font-size:17px;line-height:1.5;color:var(--ink);}
+  .rrow .rv b{font-weight:600;}
+  .rrow .rv .mono{font-style:italic;}
+  .chip{display:inline-block;font-size:14px;color:var(--ink);margin:0 4px 0 0;}
+  .chip:not(:last-child)::after{content:" ·";color:var(--rule);}
+  .warn{padding:16px 0 2px;}
+  .warn .rk{color:var(--accent);}
+  .warn .rv{font-size:15.5px;color:var(--ink);font-style:italic;}
+  .actions{display:flex;gap:24px;flex-wrap:wrap;margin-top:26px;}
+  .btn{font-family:inherit;font-size:15px;font-style:italic;cursor:pointer;border:none;background:none;color:var(--ink);padding:2px 0;border-bottom:1px solid var(--ink);}
+  .btn:hover{color:var(--accent);border-color:var(--accent);}
+  .btn.ghost{color:var(--muted);border-color:var(--rule);}
+  .btn.ghost:hover{color:var(--accent);border-color:var(--accent);}
+  .path{font-size:13.5px;color:var(--muted);margin-top:22px;line-height:1.7;font-style:italic;}
+  .path b{color:var(--ink);font-style:normal;font-weight:600;}
+  .credit{margin-top:72px;padding-top:18px;border-top:1px solid var(--rule);text-align:center;font-size:12.5px;letter-spacing:.04em;color:var(--muted);font-style:italic;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">Method Selector</div>
+  <h1>Choosing an <em>ERGM</em> specification</h1>
+  <div class="src">A guided sequence of questions, routing to a single recommendation. After <b>Lusher, Koskinen &amp; Robins (2013)</b>, Cambridge University Press.</div>
+
+  <div class="prog" id="prog"></div>
+  <div class="crumbs" id="crumbs"></div>
+
+  <div id="app"></div>
+
+  <div class="credit">Developed by Doruk Sen</div>
+</div>
+
+<script>
+/* ---------------- Decision graph ---------------- */
+const NODES = {
+  start: {
+    q: "What is the primary thing you want to explain?",
+    help: "This is the single biggest fork: are you modelling the ties themselves, or an actor attribute that spreads across a fixed network?",
+    opts: [
+      {t:"The network ties", d:"Why ties form / exist between actors — structure is the outcome.", go:"modes"},
+      {t:"An actor attribute", d:"The network is fixed; you want to explain a behaviour/attribute that may diffuse across it (social influence / contagion.", go:"alaam"}
+    ]
+  },
+  modes: {
+    q: "How many node types and relations are involved?",
+    help: "The structural form of the data fixes the model family before any effects are chosen.",
+    opts: [
+      {t:"One relation, one set of actors", d:"A single network among one kind of node.", go:"timing"},
+      {t:"Two or more relations, same actors", d:"e.g. advice AND friendship on the same people.", go:"multi"},
+      {t:"Two distinct node types", d:"Actors tied to events / groups / boards (two-mode).", go:"bip_time"}
+    ]
+  },
+  timing: {
+    q: "How many time points do you observe?",
+    help: "Two or more waves let you model the process of change rather than a single snapshot.",
+    opts: [
+      {t:"One snapshot", d:"A single cross-sectional observation.", go:"directed"},
+      {t:"Two or more waves", d:"The same network observed repeatedly (panel).", go:"longi"}
+    ]
+  },
+  directed: {
+    q: "Are the ties directed?",
+    help: "Direction opens reciprocity and directed-closure effects and changes which statistics you use.",
+    opts: [
+      {t:"Directed", d:"Sender → receiver (e.g. 'asks advice of').", go:"endog", set:{dir:"directed"}},
+      {t:"Undirected", d:"Symmetric (e.g. 'collaborates with').", go:"endog", set:{dir:"undirected"}}
+    ]
+  },
+  endog: {
+    q: "What drives tie formation in your hypotheses?",
+    help: "This selects your dependence assumption — the rung on Pattison et al.'s hierarchy.",
+    opts: [
+      {t:"Attributes & covariates only", d:"Homophily, sender/receiver effects, dyadic covariates — no endogenous structure.", go:"R_selection"},
+      {t:"Endogenous structure", d:"Self-organising patterns: clustering, popularity, closure, brokerage.", go:"struct"}
+    ]
+  },
+  struct: {
+    q: "Which structural process is central?",
+    help: "Climb only as high as the theory needs. Social-circuit is the robust modern default.",
+    opts: [
+      {t:"General clustering / popularity / closure", d:"The typical case.", go:"R_socialcircuit"},
+      {t:"Brokerage combined with degree", d:"'Closure + reach' — who bridges while staying embedded.", go:"R_edgetri"},
+      {t:"Long-range / fuzzy network boundary", d:"Dependence along longer paths, or unclear who is 'in'.", go:"R_higher"}
+    ]
+  },
+  multi:    { result:"R_multi" },
+  bip_time: {
+    q: "One snapshot or several waves of the two-mode network?",
+    help:"",
+    opts:[
+      {t:"One snapshot", d:"Cross-sectional affiliation data.", go:"R_bipartite"},
+      {t:"Several waves", d:"Affiliation observed over time.", go:"R_longi_bip"}
+    ]
+  },
+  alaam:    { result:"R_alaam" },
+  longi:    { result:"R_longi" },
+};
+
+/* ---------------- Results ---------------- */
+const RESULTS = {
+  R_selection: {
+    fam:"One-mode ERGM · dyadic-independence", name:"Social-Selection ERGM",
+    rung:"Dyadic independence (I₀ / PI₀)",
+    spec:"Edge (density) + reciprocity (if directed) + actor attribute effects (sender, receiver, homophily/matching) + dyadic covariates. No endogenous star/triangle terms.",
+    est:"This reduces to logistic regression on dyads — but fit it within the ERGM framework so you can later add structure. MCMC-MLE.",
+    gof:"Simulate from the fitted model; check degree distribution, geodesics and triad census against the observed network.",
+    tools:["statnet / ergm (R)","PNet / MPNet"],
+    ch:["Ch 6.6","Ch 8"],
+    warn:"If GOF shows the model can't reproduce clustering or the degree spread, your data has endogenous structure — go back and add social-circuit terms."
+  },
+  R_socialcircuit: {
+    fam:"One-mode ERGM · social-circuit", name:"Structural ERGM with Alternating Statistics",
+    rung:"Social-circuit (SI₁ / I₁) — the recommended default",
+    spec:"Edge + (reciprocity if directed) + ALTERNATING / geometrically-weighted statistics: alternating-k-stars (GWDegree) for popularity, alternating-triangles (GWESP) for closure, alternating-2-paths. Add attribute & covariate effects as needed.",
+    est:"MCMC maximum likelihood (Geyer–Thompson importance sampling or Robbins–Monro stochastic approximation). Use Bayesian estimation instead if N is small or estimation is unstable.",
+    gof:"Simulate many graphs; compare non-modelled features (full degree distribution, shared-partner distribution, geodesic distribution, triad census).",
+    tools:["statnet / ergm (R)","PNet / MPNet","Bergm (if Bayesian)"],
+    ch:["Ch 6.6.4","Ch 12","Ch 13"],
+    warn:"Do NOT use raw Markov stars & triangles — they are degeneracy-prone. If MCMC won't converge, suspect the specification, not the algorithm; alternating forms are the fix."
+  },
+  R_edgetri: {
+    fam:"One-mode ERGM · edge-triangle", name:"Edge-Triangle (PI₁) Model",
+    rung:"Partial inclusion (PI₁)",
+    spec:"Edge-triangle statistics that couple closure with degree, letting you separate actors who are both embedded (closed) and reaching outward (brokerage). Combine with the usual edge + alternating terms.",
+    est:"MCMC-MLE. Run a long post-estimation simulation to confirm stability — higher-order specifications need extra care.",
+    gof:"Standard simulation-based GOF, paying attention to the closure/degree features the model targets.",
+    tools:["PNet / MPNet","statnet / ergm (R)"],
+    ch:["Ch 22.2","Ch 6.6"],
+    warn:"This is a specialised rung — only adopt it if brokerage-with-degree is genuinely central to your theory (Occam's razor)."
+  },
+  R_higher: {
+    fam:"One-mode ERGM · higher realisation-dependent", name:"Long-Range / Component-Dependent Model",
+    rung:"Three-path (D₁) up to component independence (Dₙ₋₁)",
+    spec:"Three-path or longer-path dependence; or component independence when the network boundary is uncertain (confines attention to connected components).",
+    est:"MCMC-MLE; consider Bayesian. If you reached this via a snowball/link-traced sample, use conditional zone-based estimation (you needn't know total N).",
+    gof:"Simulation-based GOF; be especially alert to degeneracy at these general specifications.",
+    tools:["PNet / MPNet","statnet / ergm (R)"],
+    ch:["Ch 22.2","Ch 12.8"],
+    warn:"The most general rungs are the most degeneracy-prone. Justify each added term theoretically and validate fit carefully."
+  },
+  R_multi: {
+    fam:"Multivariate ERGM", name:"Multivariate (Multi-Relational) ERGM",
+    rung:"Cross-network dependence",
+    spec:"Model the relations jointly with cross-relation effects: entrainment (ties co-occur), exchange (reciprocity across relations), and cross-relation closure. Alternatively enter one network as a dyadic covariate for the other if you only want directional influence.",
+    est:"MCMC-MLE for the joint model.",
+    gof:"Simulate the multivariate system; check fit within and across relations.",
+    tools:["PNet / MPNet (XPNet)","statnet / ergm (R)"],
+    ch:["Ch 10","Ch 16","Ch 21"],
+    warn:"Decide deliberately between a joint multivariate model and the simpler 'one network as covariate' approach — they answer different questions."
+  },
+  R_bipartite: {
+    fam:"Bipartite ERGM", name:"Bipartite (Two-Mode) ERGM",
+    rung:"Bipartite dependence hierarchy",
+    spec:"Mode-specific statistics: edges, mode-specific alternating stars (degree distributions of actors vs. events), and alternating cycles (4-cycles) for co-affiliation clustering. Ordinary triangles cannot form in two-mode data.",
+    est:"MCMC-MLE with bipartite specifications.",
+    gof:"Simulation-based GOF on both mode degree distributions and cycle statistics.",
+    tools:["PNet / MPNet (BPNet)","statnet / ergm (R)"],
+    ch:["Ch 10","Ch 20"],
+    warn:"Use the bipartite hierarchy and bipartite statistics — do not port one-mode triangle terms across."
+  },
+  R_longi: {
+    fam:"Longitudinal ERGM", name:"Longitudinal (Tie-Oriented) ERGM",
+    rung:"Continuous-time Markov process",
+    spec:"Model the change between waves as a continuous-time Markov chain on ties; specify the same structural + attribute effects but interpret them as drivers of tie change. The actor-oriented SAOM (SIENA) is a valid alternative.",
+    est:"Estimation conditions on the observed change between consecutive waves (modified Robbins–Monro).",
+    gof:"Assess reproduction of network features across waves.",
+    tools:["statnet (tergm)","PNet / MPNet (longitudinal)","RSiena (SAOM alternative)"],
+    ch:["Ch 11","Ch 19","Ch 12.4.3"],
+    warn:"You need at least two genuine waves. Choose tie-oriented (ERGM) vs actor-oriented (SAOM) based on whether change is driven by ties or by actors making choices."
+  },
+  R_longi_bip: {
+    fam:"Longitudinal bipartite", name:"Longitudinal Bipartite ERGM",
+    rung:"Continuous-time process on two-mode ties",
+    spec:"Combine the bipartite specification (mode-specific stars, 4-cycles) with a tie-oriented dynamic model of change between waves.",
+    est:"Change-conditioned estimation as in the longitudinal model.",
+    gof:"Reproduction of two-mode features across waves.",
+    tools:["PNet / MPNet (longitudinal)","statnet (tergm)"],
+    ch:["Ch 10","Ch 11","Ch 20"],
+    warn:"This combines two of the harder branches — keep the specification lean and validate fit carefully."
+  },
+  R_alaam: {
+    fam:"Influence model", name:"Autologistic Actor Attribute Model (ALAAM)",
+    rung:"Network → attribute dependence",
+    spec:"The outcome is the actor attribute, not the tie. Specify: independence (baseline prevalence), network-position effects (does being central/active raise the outcome?), network-attribute effects (contagion — do connected actors share the outcome?), and covariate effects.",
+    est:"MCMC maximum likelihood, analogous to ERGM estimation.",
+    gof:"Simulate the attribute vector given the fixed network; compare to observed.",
+    tools:["PNet / MPNet (ALAAM module)","IPNet"],
+    ch:["Ch 9","Ch 18"],
+    warn:"The network is treated as fixed/exogenous here. If ties and behaviour co-evolve, you instead want a longitudinal co-evolution model (SAOM)."
+  }
+};
+
+/* ---------------- Engine ---------------- */
+const app = document.getElementById('app');
+const progEl = document.getElementById('prog');
+const crumbEl = document.getElementById('crumbs');
+let history = [];      // stack of node keys
+let trail = [];        // chosen option labels
+let answers = {};
+
+function setProgress(){
+  const total = 4;
+  progEl.innerHTML="";
+  const depth = Math.min(history.length, total);
+  for(let i=0;i<total;i++){
+    const s=document.createElement('div');
+    s.className="pseg"+(i<depth-1?" done":(i===depth-1?" active":""));
+    progEl.appendChild(s);
+  }
+  crumbEl.innerHTML = trail.length
+    ? trail.map(t=>`<b>${t}</b>`).join(' <span>&rsaquo;</span> ')
+    : "Each answer narrows the choice toward one method.";
+}
+
+function render(key){
+  // A key may point straight at a result (lives in RESULTS, not NODES)
+  if(RESULTS[key]){ return renderResult(key); }
+  const node = NODES[key];
+  if(node && node.result){ return renderResult(node.result); }
+
+  setProgress();
+  let html = `<div class="stage"><div class="qnum">Question ${history.length}</div>`;
+  html += `<div class="qtext">${node.q}</div>`;
+  if(node.help) html += `<div class="qhelp">${node.help}</div>`;
+  html += `<div class="opts">`;
+  node.opts.forEach((o,i)=>{
+    html += `<button class="opt" data-i="${i}">
+      <span class="mark">&rarr;</span>
+      <span class="otext"><span class="ot">${o.t}</span>
+      <span class="od">${o.d}</span></span></button>`;
+  });
+  html += `</div>`;
+  if(history.length>1) html += `<button class="back" id="back">Back</button>`;
+  html += `</div>`;
+  app.innerHTML = html;
+
+  app.querySelectorAll('.opt').forEach(btn=>{
+    btn.onclick = ()=>{
+      const o = node.opts[+btn.dataset.i];
+      if(o.set) Object.assign(answers,o.set);
+      trail.push(o.t);
+      history.push(o.go);
+      render(o.go);
+      window.scrollTo({top:0,behavior:'smooth'});
+    };
+  });
+  const back = document.getElementById('back');
+  if(back) back.onclick = goBack;
+}
+
+function goBack(){
+  history.pop(); trail.pop();
+  render(history[history.length-1]);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function renderResult(rkey){
+  const r = RESULTS[rkey];
+  // mark all progress done
+  progEl.innerHTML="";
+  for(let i=0;i<4;i++){const s=document.createElement('div');s.className="pseg done";progEl.appendChild(s);}
+  crumbEl.innerHTML = trail.map(t=>`<b>${t}</b>`).join(' <span>&rsaquo;</span> ');
+
+  let dirNote = answers.dir ? ` <span class="chip">${answers.dir} ties</span>` : "";
+
+  app.innerHTML = `
+  <div class="result">
+    <div class="rlabel">Recommended method</div>
+    <div class="rhead">
+      <div class="rname">${r.name}</div>
+      <div class="rfam">${r.fam}</div>
+    </div>
+    <div class="rrow"><span class="rk">Dependence assumption</span><div class="rv"><span class="mono">${r.rung}</span></div></div>
+    <div class="rrow"><span class="rk">Specify</span><div class="rv">${r.spec}${dirNote}</div></div>
+    <div class="rrow"><span class="rk">Estimate</span><div class="rv">${r.est}</div></div>
+    <div class="rrow"><span class="rk">Check fit</span><div class="rv">${r.gof}</div></div>
+    <div class="rrow"><span class="rk">Software</span><div class="rv">${r.tools.map(t=>`<span class="chip">${t}</span>`).join('')}</div></div>
+    <div class="warn"><span class="rk">A caution</span><div class="rv">${r.warn}</div></div>
+    <div class="path">In the book: ${r.ch.map(c=>`<b>${c}</b>`).join(', ')} of Lusher, Koskinen &amp; Robins (2013).</div>
+    <div class="actions">
+      <button class="btn ghost" id="back2">Change last answer</button>
+      <button class="btn" id="restart">Start over</button>
+    </div>
+  </div>`;
+
+  document.getElementById('restart').onclick = ()=>{ history=['start']; trail=[]; answers={}; render('start'); window.scrollTo({top:0,behavior:'smooth'}); };
+  document.getElementById('back2').onclick = goBack;
+}
+
+/* boot */
+history=['start'];
+render('start');
+</script>
+</body>
+</html>
